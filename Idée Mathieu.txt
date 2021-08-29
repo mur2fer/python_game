@@ -1,0 +1,9 @@
+Ecran de combat
+Boites de dialogue
+Inventaire
+Sauvegarde
+Apparition de monstres / déclenchement des combats
+Animations des déplacements
+Ajout de scripts correspondants aux objets/NPC sur la map
+Trouver/creer des sprites/tiles pour le jeu
+Gérer le changement de map
