@@ -1,0 +1,9 @@
+- Village avec 3-4 batiment à définir leur utilisation ( Guilde/Magasin/forgeron etc...)
+- Interface niveau 
+- Mettre des niveaux faire des sets avec de l'xp etc...
+- Interface quête 
+- Interface artisanat 
+- interface inventaire
+- Sprites quelques items 
+- Interface Magasin
+- Interface Sauvegarde
