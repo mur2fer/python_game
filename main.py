@@ -44,19 +44,23 @@ class Game:
         """
         # folders path
         game_folder = path.dirname(__file__)
-        img_folder = path.join(game_folder, 'img')
+        self.img_folder = path.join(game_folder, 'img')
         snd_folder = path.join(game_folder, 'snd')
         music_folder = path.join(game_folder, 'music')
         self.map_folder = path.join(game_folder, 'maps')
         
         # load fonts
-        self.title_font = path.join(img_folder, 'ZOMBIE.TTF')
-        self.hud_font = path.join(img_folder, 'Impacted2.0.ttf')
+        self.title_font = path.join(self.img_folder, 'ZOMBIE.TTF')
+        self.hud_font = path.join(self.img_folder, 'Impacted2.0.ttf')
         # load images
-        self.player_img = pg.image.load(path.join(img_folder, PLAYER_IMG)).convert_alpha()
+        self.player_images = {}
+        for image in PLAYER_IMAGES:
+            self.player_images[image] = pg.image.load(path.join(self.img_folder, PLAYER_IMAGES[image])).convert_alpha()
+            self.player_images[image] = pg.transform.scale(self.player_images[image], PLAYER_DIMENSIONS)
+            self.player_images[image].set_colorkey(PLAYER_BACKGROUND_COLOR)     # remove background pixels
         self.item_images = {}
         for item in ITEM_IMAGES:
-            self.item_images[item] = pg.image.load(path.join(img_folder, ITEM_IMAGES[item])).convert_alpha()
+            self.item_images[item] = pg.image.load(path.join(self.img_folder, ITEM_IMAGES[item])).convert_alpha()
         # Sound loading
         pg.mixer.music.load(path.join(music_folder, BG_MUSIC))
         self.effects_sounds = {}
@@ -69,7 +73,7 @@ class Game:
         # lighting effect
         self.fog = pg.Surface((WIDTH, HEIGHT))
         self.fog.fill(NIGHT_COLOR)
-        self.light_mask = pg.image.load(path.join(img_folder, LIGHT_MASK)).convert_alpha()
+        self.light_mask = pg.image.load(path.join(self.img_folder, LIGHT_MASK)).convert_alpha()
         self.light_mask = pg.transform.scale(self.light_mask, LIGHT_RADIUS)                             # resize image
         self.light_rect = self.light_mask.get_rect()
 
@@ -80,17 +84,31 @@ class Game:
         self.all_sprites = pg.sprite.LayeredUpdates()                   # use layers to display sprites
         self.walls = pg.sprite.Group()
         self.items = pg.sprite.Group()
+        self.npcs = pg.sprite.Group()
+        self.players = pg.sprite.Group()
         
         # create the map
         self.map = TiledMap(path.join(self.map_folder, 'level1.tmx'))
+        self.above_map = TiledMap(path.join(self.map_folder, 'level1_above_layer.tmx'))
         self.map_img = self.map.make_map()
+        self.above_map_img = self.above_map.make_map(0)
         self.map.rect = self.map_img.get_rect()
+        self.above_map.rect = self.above_map_img.get_rect()
+        self.ncpc_list = []
+        self.NPC_images = {}
         # create objects and walls on the map
         for tile_object in self.map.tmxdata.objects:
             obj_center = vec(tile_object.x + tile_object.width / 2,
                              tile_object.y + tile_object.height / 2)
             if tile_object.name == 'player':
                 self.player = Player(self, obj_center.x, obj_center.y)
+            if tile_object.name == 'NPC':
+                self.NPC_images[tile_object.type] = {}
+                for image in NPC_IMAGES[tile_object.type]:
+                    self.NPC_images[tile_object.type][image] = pg.image.load(path.join(self.img_folder, NPC_IMAGES[tile_object.type][image])).convert_alpha()
+                    self.NPC_images[tile_object.type][image] = pg.transform.scale(self.NPC_images[tile_object.type][image], NPC_DIMENSIONS)
+                    self.NPC_images[tile_object.type][image].set_colorkey(NPC_BACKGROUND_COLOR)     # remove background pixels
+                self.ncpc_list.append(NPC(self, obj_center.x, obj_center.y, tile_object.type))
             if tile_object.name == 'wall':
                 Obstacle(self, tile_object.x, tile_object.y,
                          tile_object.width, tile_object.height)
@@ -151,6 +169,7 @@ class Game:
             self.screen.blit(sprite.image, self.camera.apply(sprite))   # draw the sprites at the correct position for the camera
             if self.draw_debug:
                 pg.draw.rect(self.screen, CYAN, self.camera.apply_rect(sprite.hit_rect), 1) # draw hitboxes
+        self.screen.blit(self.above_map_img, self.camera.apply(self.above_map))     # draw the above elements at the correct position for the camera
         if self.draw_debug:
             for wall in self.walls:
                 pg.draw.rect(self.screen, CYAN, self.camera.apply_rect(wall.rect), 1)   # draw walls hitboxes

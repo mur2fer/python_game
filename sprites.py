@@ -33,6 +33,8 @@ def collide_with_group(sprite: pg.sprite.Sprite, group: pg.sprite.Group, dir: st
     """
     hits = pg.sprite.spritecollide(sprite, group, False, collide_hit_rect)  # list of sprites which collide
     if hits:
+        if hits[0] == sprite:
+            return
         if dir == 'x+':
             if hits[0].hit_rect.centerx >= sprite.hit_rect.centerx:  # obstacle to the right
                 sprite.hit_rect.centerx = hits[0].hit_rect.left - sprite.hit_rect.width / 2
@@ -57,14 +59,14 @@ class Player(pg.sprite.Sprite):
             y (int): vertical position of player center
         """
         self._layer = PLAYER_LAYER  # to display on the good layer
-        self.groups = game.all_sprites
+        self.groups = game.all_sprites, game.players
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game = game
-        self.image = game.player_img
+        self.image = game.player_images['RIGHT_still']
         self.rect = self.image.get_rect()
-        self.rect.center = (x, y)
+        self.rect.center = (x, y-PLAYER_IMG_OFFSET)
         self.hit_rect = PLAYER_HIT_RECT
-        self.hit_rect.center = self.rect.center
+        self.hit_rect.center = (x, y)
         self.vel = vec(0, 0)
         self.pos = vec(x, y)
         self.rot = ROT_RIGHT
@@ -91,7 +93,7 @@ class Player(pg.sprite.Sprite):
                     # rotate sprite
                     self.last_rot = pg.time.get_ticks()
                     self.rot = ROT_LEFT
-                    self.image = pg.transform.rotate(self.game.player_img, self.rot)
+                    self.image = self.game.player_images['LEFT_still']
                     self.dir = 'x-'
             elif keys[pg.K_RIGHT] or keys[pg.K_d]:
                 if self.rot == ROT_RIGHT:       # already in the same direction as input
@@ -106,7 +108,7 @@ class Player(pg.sprite.Sprite):
                     # rotate sprite
                     self.last_rot = pg.time.get_ticks()
                     self.rot = ROT_RIGHT
-                    self.image = pg.transform.rotate(self.game.player_img, self.rot)
+                    self.image = self.game.player_images['RIGHT_still']
                     self.dir = 'x+'
             elif keys[pg.K_UP] or keys[pg.K_w]:
                 if self.rot == ROT_UP:          # already in the same direction as input
@@ -121,7 +123,7 @@ class Player(pg.sprite.Sprite):
                     # rotate sprite
                     self.last_rot = pg.time.get_ticks()
                     self.rot = ROT_UP
-                    self.image = pg.transform.rotate(self.game.player_img, self.rot)
+                    self.image = self.game.player_images['UP_still']
                     self.dir = 'y-'
             elif keys[pg.K_DOWN] or keys[pg.K_s]:
                 if self.rot == ROT_DOWN:        # already in the same direction as input
@@ -136,16 +138,17 @@ class Player(pg.sprite.Sprite):
                     # rotate sprite
                     self.last_rot = pg.time.get_ticks()
                     self.rot = ROT_DOWN
-                    self.image = pg.transform.rotate(self.game.player_img, self.rot)
+                    self.image = self.game.player_images['DOWN_still']
                     self.dir = 'y+'
 
             if self.moving:
                 if keys[pg.K_SPACE]:
-                    self.vel = vec(PLAYER_RUNNING_SPEED, 0).rotate(-self.rot)
+                    self.vel = vec(RUNNING_SPEED, 0).rotate(-self.rot)
                 else:
-                    self.vel = vec(PLAYER_SPEED, 0).rotate(-self.rot)
+                    self.vel = vec(WALKING_SPEED, 0).rotate(-self.rot)
                 collide_with_group(self, self.game.walls, self.dir)
                 collide_with_group(self, self.game.items, self.dir)
+                collide_with_group(self, self.game.npcs, self.dir)
                 
 
     def update(self):
@@ -155,22 +158,130 @@ class Player(pg.sprite.Sprite):
         if self.moving:
             self.pos += self.vel * self.game.dt     # compute new sprite position
             self.rect = self.image.get_rect()
-            self.rect.center = self.pos             # position sprite
-            if self.rot == ROT_RIGHT and self.rect.centerx >= self.hit_rect.centerx:    # when sprite reach its hitbox
+            self.rect.center = (self.pos.x, self.pos.y-PLAYER_IMG_OFFSET)       # position sprite
+            if self.rot == ROT_RIGHT and self.pos.x >= self.hit_rect.centerx:    # when sprite reach its hitbox
                 self.moving = False
-            elif self.rot == ROT_LEFT and self.rect.centerx <= self.hit_rect.centerx:   # when sprite reach its hitbox
+            elif self.rot == ROT_LEFT and self.pos.x <= self.hit_rect.centerx:   # when sprite reach its hitbox
                 self.moving = False
-            elif self.rot == ROT_UP and self.rect.centery <= self.hit_rect.centery:     # when sprite reach its hitbox
+            elif self.rot == ROT_UP and self.pos.y <= self.hit_rect.centery:     # when sprite reach its hitbox
                 self.moving = False
-            elif self.rot == ROT_DOWN and self.rect.centery >= self.hit_rect.centery:   # when sprite reach its hitbox
+            elif self.rot == ROT_DOWN and self.pos.y >= self.hit_rect.centery:   # when sprite reach its hitbox
                 self.moving = False
             
             if not self.moving:
                 self.last_moved = pg.time.get_ticks()
                 self.vel = vec(0, 0)
-                self.rect.center = self.hit_rect.center           # adjust sprite position on hitbox
-                self.pos = (self.rect.centerx, self.rect.centery)   # register sprite position to avoid shifts
+                self.rect.center = (self.hit_rect.centerx, self.hit_rect.centery-PLAYER_IMG_OFFSET) # adjust sprite position on hitbox
+                self.pos = vec(self.hit_rect.centerx, self.hit_rect.centery)   # register sprite position to avoid shifts
+
+
+class NPC(pg.sprite.Sprite):
+    def __init__(self, game, x: int, y: int, type: str):
+        """Create a NPC in the game.
+
+        Args:
+            game (Game): game used
+            x (int): horizontal position of NPC center
+            y (int): vertical position of NPC center
+            type (str): type of NPC
+        """
+        self.type = type
+        self._layer = NPC_BELOW_LAYER
+        self.groups = game.all_sprites, game.npcs
+        pg.sprite.Sprite.__init__(self, self.groups)
+        self.game = game
+        self.image = game.NPC_images[self.type]['DOWN_still']
+        self.rect = self.image.get_rect()
+        self.rect.center = (x, y-NPC_IMG_OFFSET)
+        self.hit_rect = NPC_HIT_RECT
+        self.hit_rect.center = (x, y)
+        self.vel = vec(0, 0)
+        self.pos = vec(x, y)
+        self.rot = ROT_DOWN
+        self.last_rot = pg.time.get_ticks()
+        self.last_moved = pg.time.get_ticks()
+        self.move_index = 0
+        self.dir = 'y+'
+        self.moving = False
+    
+    def move(self, dir: str):
+        if dir == 'left':
+            self.hit_rect.centerx -= TILESIZE
+            self.moving = True
+            if self.rot != ROT_LEFT:
+                # rotate sprite
+                self.last_rot = pg.time.get_ticks()
+                self.rot = ROT_LEFT
+                self.image = self.game.NPC_images[self.type]['LEFT_still']
+                self.dir = 'x-'
+        elif dir == 'right':
+            self.hit_rect.centerx += TILESIZE
+            self.moving = True
+            if self.rot != ROT_RIGHT:
+                # rotate sprite
+                self.last_rot = pg.time.get_ticks()
+                self.rot = ROT_RIGHT
+                self.image = self.game.NPC_images[self.type]['RIGHT_still']
+                self.dir = 'x+'
+        elif dir == 'up':
+            self.hit_rect.centery -= TILESIZE
+            self.moving = True
+            if self.rot != ROT_UP:
+                # rotate sprite
+                self.last_rot = pg.time.get_ticks()
+                self.rot = ROT_UP
+                self.image = self.game.NPC_images[self.type]['UP_still']
+                self.dir = 'y-'
+        elif dir == 'down':
+            self.hit_rect.centery += TILESIZE
+            self.moving = True
+            if self.rot != ROT_DOWN:
+                # rotate sprite
+                self.last_rot = pg.time.get_ticks()
+                self.rot = ROT_DOWN
+                self.image = self.game.NPC_images[self.type]['DOWN_still']
+                self.dir = 'y+'
         
+        if self.moving:
+            self.vel = vec(WALKING_SPEED, 0).rotate(-self.rot)
+            collide_with_group(self, self.game.walls, self.dir)
+            collide_with_group(self, self.game.items, self.dir)
+            collide_with_group(self, self.game.npcs, self.dir)
+            collide_with_group(self, self.game.players, self.dir)
+    
+    def update(self):
+        """Update NPC.
+        """
+        # update layer to display above or below the player
+        if (self._layer == NPC_BELOW_LAYER) and (self.game.player.pos.y < self.pos.y):
+            self.game.all_sprites.change_layer(self, NPC_ABOVE_LAYER)
+        elif (self._layer == NPC_ABOVE_LAYER) and (self.game.player.pos.y > self.pos.y):
+            self.game.all_sprites.change_layer(self, NPC_BELOW_LAYER)
+        # do deplacement loop
+        if not self.moving and (pg.time.get_ticks() - self.last_moved > MOVEMENT_COOLDOWN):
+            self.move(NPC_MOVEMENT_LIST[self.move_index])
+            if self.rect.center != (self.hit_rect.centerx, self.hit_rect.centery-NPC_IMG_OFFSET):
+                self.move_index += 1
+                if self.move_index == len(NPC_MOVEMENT_LIST):
+                    self.move_index = 0
+        if self.moving:
+            self.pos += self.vel * self.game.dt     # compute new sprite position
+            self.rect = self.image.get_rect()
+            self.rect.center = (self.pos.x, self.pos.y-NPC_IMG_OFFSET)       # position sprite
+            if self.rot == ROT_RIGHT and self.pos.x >= self.hit_rect.centerx:    # when sprite reach its hitbox
+                self.moving = False
+            elif self.rot == ROT_LEFT and self.pos.x <= self.hit_rect.centerx:   # when sprite reach its hitbox
+                self.moving = False
+            elif self.rot == ROT_UP and self.pos.y <= self.hit_rect.centery:     # when sprite reach its hitbox
+                self.moving = False
+            elif self.rot == ROT_DOWN and self.pos.y >= self.hit_rect.centery:   # when sprite reach its hitbox
+                self.moving = False
+            
+            if not self.moving:
+                self.last_moved = pg.time.get_ticks()
+                self.vel = vec(0, 0)
+                self.rect.center = (self.hit_rect.centerx, self.hit_rect.centery-NPC_IMG_OFFSET) # adjust sprite position on hitbox
+                self.pos = vec(self.hit_rect.centerx, self.hit_rect.centery)   # register sprite position to avoid shifts
 
 
 class Obstacle(pg.sprite.Sprite):

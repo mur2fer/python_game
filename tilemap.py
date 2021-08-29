@@ -30,13 +30,17 @@ class TiledMap:
                         surface.blit(tile, (x * self.tmxdata.tilewidth,
                                             y * self.tmxdata.tileheight))
 
-    def make_map(self):
+    def make_map(self, alpha=255):
         """Create the map image.
+        
+        Args:
+            alpha (int, optional): map baground alpha. Defaults to 255 (opaque).
 
         Returns:
             pg.Surface: map image
         """
-        temp_surface = pg.Surface((self.width, self.height))
+        temp_surface = pg.Surface((self.width, self.height)).convert_alpha()
+        temp_surface.fill((0, 0, 0, alpha))
         self.render(temp_surface)
         return temp_surface
 
