@@ -115,14 +115,14 @@ class Player(pg.sprite.Sprite):
         isColliding = isColliding or collide_with_group(self, self.game.npcs, self.dir)
         # choose Player animation
         if isColliding:
-            self.animation = PLAYER_BONK_ANIMATION
-            self.animated = PLAYER_STEP_ANIM_LENGTH
+            self.animation = BONK_ANIMATION
+            self.animated = STEP_ANIM_LENGTH
         elif self.running:
-            self.animation = PLAYER_RUNNING_ANIMATION
-            self.animated = PLAYER_STEP_ANIM_LENGTH
+            self.animation = RUNNING_ANIMATION
+            self.animated = STEP_ANIM_LENGTH
         else:
-            self.animation = PLAYER_WALKING_ANIMATION
-            self.animated = PLAYER_STEP_ANIM_LENGTH
+            self.animation = WALKING_ANIMATION
+            self.animated = STEP_ANIM_LENGTH
         self.animation_length = len(self.animation)
         if(use_anim):
             # start animation
@@ -140,8 +140,8 @@ class Player(pg.sprite.Sprite):
         self.dir = dir
         self.rot = rot
         self.last_rot = pg.time.get_ticks()
-        self.animation = PLAYER_ROT_ANIMATION
-        self.animated = PLAYER_STEP_ANIM_LENGTH
+        self.animation = ROT_ANIMATION
+        self.animated = STEP_ANIM_LENGTH
         self.animation_length = len(self.animation)
         if(use_anim):
             self.increment_animation()
@@ -211,7 +211,7 @@ class Player(pg.sprite.Sprite):
                 self.pos = vec(self.hit_rect.centerx, self.hit_rect.centery)   # register sprite position to avoid shifts
         # reset sprite if not animated
         if not self.animated and (pg.time.get_ticks() - self.last_moved > TIME_KEEP_MOVING):
-            self.animation = PLAYER_WALKING_ANIMATION
+            self.animation = WALKING_ANIMATION
             self.running = False
             self.image = self.game.player_images[self.dir + self.animation[self.animation_index][0]]
             self.rect = self.image.get_rect()
@@ -241,61 +241,97 @@ class NPC(pg.sprite.Sprite):
         self.vel = vec(0, 0)
         self.pos = vec(x, y)
         self.rot = ROT_DOWN
-        self.last_rot = pg.time.get_ticks()
-        self.last_moved = pg.time.get_ticks()
-        self.move_index = 0
         self.dir = DOWN
         self.moving = False
+        self.move_index = 0
+        self.last_moved = pg.time.get_ticks()
+        self.animation = None
+        self.animation_length = 0
+        self.animation_index = 0
+        self.animated = 0
+        self.started_animation = pg.time.get_ticks()
     
-    def move(self, dir: str):
-        """Move the NPC and manage its rotation.
+    def increment_animation(self):
+        """Increment the animation step and update image.
+        """
+        self.animation_index += 1
+        if self.animation_index >= self.animation_length:
+            self.animation_index = 0
+        self.image = self.game.NPC_images[self.type][self.dir + self.animation[self.animation_index][0]]
+        self.started_animation = pg.time.get_ticks()
+    
+    def move(self, move_x: int, move_y: int, rot: int, dir: str) -> bool:
+        """Move the NPC and start the movement animatiion.
 
         Args:
-            dir (str): deplacement direction
-        """
-        if dir == LEFT:
-            self.hit_rect.centerx -= TILESIZE
-            self.moving = True
-            if self.rot != ROT_LEFT:
-                # rotate sprite
-                self.last_rot = pg.time.get_ticks()
-                self.rot = ROT_LEFT
-                self.image = self.game.NPC_images[self.type]['LEFT_still']
-                self.dir = LEFT
-        elif dir == RIGHT:
-            self.hit_rect.centerx += TILESIZE
-            self.moving = True
-            if self.rot != ROT_RIGHT:
-                # rotate sprite
-                self.last_rot = pg.time.get_ticks()
-                self.rot = ROT_RIGHT
-                self.image = self.game.NPC_images[self.type]['RIGHT_still']
-                self.dir = RIGHT
-        elif dir == UP:
-            self.hit_rect.centery -= TILESIZE
-            self.moving = True
-            if self.rot != ROT_UP:
-                # rotate sprite
-                self.last_rot = pg.time.get_ticks()
-                self.rot = ROT_UP
-                self.image = self.game.NPC_images[self.type]['UP_still']
-                self.dir = UP
-        elif dir == DOWN:
-            self.hit_rect.centery += TILESIZE
-            self.moving = True
-            if self.rot != ROT_DOWN:
-                # rotate sprite
-                self.last_rot = pg.time.get_ticks()
-                self.rot = ROT_DOWN
-                self.image = self.game.NPC_images[self.type]['DOWN_still']
-                self.dir = DOWN
+            move_x (int): x deplacement to move NPC
+            move_y (int): y deplacement to move NPC
+            rot (int): rotation in degrees
+            dir (str): constant LEFT, RIGHT, UP or DOWN
         
-        if self.moving:
+        Returns:
+            True if not colliding
+        """
+        self.dir = dir
+        self.rot = rot
+        # move hitbox
+        self.hit_rect.centerx += move_x
+        self.hit_rect.centery += move_y
+        isColliding = collide_with_group(self, self.game.walls, self.dir)
+        isColliding = isColliding or collide_with_group(self, self.game.items, self.dir)
+        isColliding = isColliding or collide_with_group(self, self.game.npcs, self.dir)
+        isColliding = isColliding or collide_with_group(self, self.game.players, self.dir)
+        # animate if needed
+        if not isColliding:
             self.vel = vec(WALKING_SPEED, 0).rotate(-self.rot)
-            collide_with_group(self, self.game.walls, self.dir)
-            collide_with_group(self, self.game.items, self.dir)
-            collide_with_group(self, self.game.npcs, self.dir)
-            collide_with_group(self, self.game.players, self.dir)
+            self.animation = WALKING_ANIMATION
+            self.animated = STEP_ANIM_LENGTH
+            self.animation_length = len(self.animation)
+            self.increment_animation()
+            self.moving = True
+            return True
+        else:
+            self.rotate(rot, dir, use_anim=True)
+            self.moving = False
+            return False
+    
+    def rotate(self, rot: int, dir: str, use_anim=False) -> bool:
+        """Rotate the NPC.
+
+        Args:
+            rot (int): rotation in degrees
+            dir (str): constant LEFT, RIGHT, UP or DOWN
+            use_anim (optional, bool): indicate if animate rotation
+        
+        Returns:
+            True
+        """
+        self.dir = dir
+        self.rot = rot
+        self.animation = ROT_ANIMATION
+        self.animated = STEP_ANIM_LENGTH
+        self.animation_length = len(self.animation)
+        if(use_anim):
+            self.increment_animation()
+        return True
+    
+    def get_move_parameters(self, dir: str) -> tuple:
+        """Returns the parameters needed for self.move().
+
+        Args:
+            dir (str): constant LEFT, RIGHT, UP or DOWN
+
+        Returns:
+            tuple:  (move_x: int, move_y: int, rot: int, dir: str)
+        """
+        if dir == UP:
+            return (0, -TILESIZE, ROT_UP, UP)
+        elif dir == DOWN:
+            return (0, +TILESIZE, ROT_DOWN, DOWN)
+        elif dir == LEFT:
+            return (-TILESIZE, 0, ROT_LEFT, LEFT)
+        else:
+            return (+TILESIZE, 0, ROT_RIGHT, RIGHT)
     
     def update(self):
         """Update NPC.
@@ -307,12 +343,24 @@ class NPC(pg.sprite.Sprite):
             self.game.all_sprites.change_layer(self, NPC_BELOW_LAYER)
         # do deplacement loop
         if not self.moving and (pg.time.get_ticks() - self.last_moved > MOVEMENT_COOLDOWN):
-            self.move(NPC_MOVEMENT_LIST[self.move_index])
-            if self.rect.center != (self.hit_rect.centerx, self.hit_rect.centery-NPC_IMG_OFFSET):
-                # if hitbox have move, increment move_index
+            movement = NPC_MOVEMENT_LIST[self.move_index]
+            move_tuple = self.get_move_parameters(movement[1])
+            success = False
+            if movement[0] == MOVE:
+                success = self.move(move_tuple[0], move_tuple[1], move_tuple[2], move_tuple[3])
+            else:
+                success = self.rotate(move_tuple[2], move_tuple[3], use_anim=True)
+            self.last_moved = pg.time.get_ticks()
+            if success:
+                # increment move_index
                 self.move_index += 1
                 if self.move_index == len(NPC_MOVEMENT_LIST):
                     self.move_index = 0
+        # manage animation steps
+        if self.animated and (pg.time.get_ticks() - self.started_animation > self.animation[self.animation_index][1]):
+            self.animated -= 1
+            if self.animated:
+                self.increment_animation()
         # move sprite
         if self.moving:
             self.pos += self.vel * self.game.dt     # compute new sprite position
@@ -328,7 +376,6 @@ class NPC(pg.sprite.Sprite):
                 self.moving = False
             
             if not self.moving:
-                self.last_moved = pg.time.get_ticks()
                 self.vel = vec(0, 0)
                 self.rect.center = (self.hit_rect.centerx, self.hit_rect.centery-NPC_IMG_OFFSET) # adjust sprite position on hitbox
                 self.pos = vec(self.hit_rect.centerx, self.hit_rect.centery)   # register sprite position to avoid shifts

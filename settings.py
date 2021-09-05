@@ -68,16 +68,16 @@ PLAYER_IMAGES = {'UP_still': 'player/Male_player_still_up.png',
                  'LEFT_running2': 'player/Male_player_running2_left.png',
                  'RIGHT_running2': 'player/Male_player_running2_right.png',}
 PLAYER_HIT_RECT = pg.Rect(0, 0, TILESIZE, TILESIZE)
-PLAYER_WALK_ANIM_LENGTH = 4     # number of frame in the full walk animation
-PLAYER_STEP_ANIM_LENGTH = 2     # number of frames to do a step
-PLAYER_WALK_ANIM_TIME = 3*WALK_TIME/5
-PLAYER_WALK_STILL_TIME = 2*WALK_TIME/5
-PLAYER_RUN_ANIM_TIME = 3*RUN_TIME/5
-PLAYER_RUN_STILL_TIME = 2*RUN_TIME/5
-PLAYER_ROT_ANIMATION = [('_still', 0), ('_walking1', TIME_ROTATE), ('_still', 0), ('_walking2', TIME_ROTATE)]
-PLAYER_WALKING_ANIMATION = [('_still', PLAYER_WALK_STILL_TIME), ('_walking1', PLAYER_WALK_ANIM_TIME), ('_still', PLAYER_WALK_STILL_TIME), ('_walking2', PLAYER_WALK_ANIM_TIME)]
-PLAYER_BONK_ANIMATION = [('_still', 2*PLAYER_WALK_STILL_TIME), ('_walking1', 2*PLAYER_WALK_ANIM_TIME), ('_still', 2*PLAYER_WALK_STILL_TIME), ('_walking2', 2*PLAYER_WALK_ANIM_TIME)]
-PLAYER_RUNNING_ANIMATION = [('_run_still', PLAYER_RUN_STILL_TIME), ('_running1', PLAYER_RUN_ANIM_TIME), ('_run_still', PLAYER_RUN_STILL_TIME), ('_running2', PLAYER_RUN_ANIM_TIME)]
+WALK_ANIM_LENGTH = 4     # number of frame in the full walk animation
+STEP_ANIM_LENGTH = 2     # number of frames to do a step
+WALK_ANIM_TIME = 3*WALK_TIME/5
+WALK_STILL_TIME = 2*WALK_TIME/5
+RUN_ANIM_TIME = 3*RUN_TIME/5
+RUN_STILL_TIME = 2*RUN_TIME/5
+ROT_ANIMATION = [('_still', 0), ('_walking1', TIME_ROTATE), ('_still', 0), ('_walking2', TIME_ROTATE)]
+WALKING_ANIMATION = [('_still', WALK_STILL_TIME), ('_walking1', WALK_ANIM_TIME), ('_still', WALK_STILL_TIME), ('_walking2', WALK_ANIM_TIME)]
+BONK_ANIMATION = [('_still', 2*WALK_STILL_TIME), ('_walking1', 2*WALK_ANIM_TIME), ('_still', 2*WALK_STILL_TIME), ('_walking2', 2*WALK_ANIM_TIME)]
+RUNNING_ANIMATION = [('_run_still', RUN_STILL_TIME), ('_running1', RUN_ANIM_TIME), ('_run_still', RUN_STILL_TIME), ('_running2', RUN_ANIM_TIME)]
 
 # NPC settings
 NPC_DIMENSIONS = (56, 80)
@@ -86,10 +86,20 @@ NPC_IMG_OFFSET = (NPC_DIMENSIONS[1]-TILESIZE)//2 + TILESIZE//16  # if npc sprite
 NPC_IMAGES = {'Ace_trainer': {'UP_still': 'NPC/Ace_trainer_still_up.png',
                               'DOWN_still': 'NPC/Ace_trainer_still_down.png',
                               'LEFT_still': 'NPC/Ace_trainer_still_left.png',
-                              'RIGHT_still': 'NPC/Ace_trainer_still_right.png'}
+                              'RIGHT_still': 'NPC/Ace_trainer_still_right.png',
+                              'UP_walking1': 'NPC/Ace_trainer_walking1_up.png',
+                              'DOWN_walking1': 'NPC/Ace_trainer_walking1_down.png',
+                              'LEFT_walking1': 'NPC/Ace_trainer_walking1_left.png',
+                              'RIGHT_walking1': 'NPC/Ace_trainer_walking1_right.png',
+                              'UP_walking2': 'NPC/Ace_trainer_walking2_up.png',
+                              'DOWN_walking2': 'NPC/Ace_trainer_walking2_down.png',
+                              'LEFT_walking2': 'NPC/Ace_trainer_walking2_left.png',
+                              'RIGHT_walking2': 'NPC/Ace_trainer_walking2_right.png'}
               }
 NPC_HIT_RECT = pg.Rect(0, 0, TILESIZE, TILESIZE)
-NPC_MOVEMENT_LIST = [UP, UP, RIGHT, DOWN, DOWN, LEFT]
+MOVE = 0
+ROTATE = 1
+NPC_MOVEMENT_LIST = [(MOVE, UP), (MOVE, UP), (ROTATE, RIGHT), (MOVE, RIGHT), (MOVE, DOWN), (MOVE, DOWN), (MOVE, LEFT)]
 MOVEMENT_COOLDOWN = 2000        # time between two NPC movements
 
 # Effects
