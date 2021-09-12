@@ -314,7 +314,7 @@ class NPC(pg.sprite.Sprite):
         # freeze game
         self.game.freezed = True
         # display dialogue
-        self.game.display_messages(["test1", "test2"])
+        self.game.display_messages([("test1", "test1.5"), "test2"])
     
     def increment_animation(self):
         """Increment the animation step and update image.

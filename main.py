@@ -11,7 +11,7 @@ from sprites import *
 from tilemap import *
 
 
-def draw_text(surface: pg.surface.Surface, text: str, font_name: str, size: int, color: tuple, x: int, y: int, align="topleft"):
+def draw_text(surface: pg.surface.Surface, text: str, font_name: str, size: int, color: tuple, x: int, y: int, align="topleft", background=None):
     """Draw text on a surface.
 
     Args:
@@ -23,9 +23,10 @@ def draw_text(surface: pg.surface.Surface, text: str, font_name: str, size: int,
         x (int): text position on horizontal axis
         y (int): text position on vertical axis
         align (str, optional): (x, y) position compared to text. Defaults to "topleft".
+        background (tuple, optional): background color to optimize computation. Defaults to None
     """
     font = pg.font.Font(font_name, size)
-    text_surface = font.render(text, True, color)
+    text_surface = font.render(text, True, color, background)
     text_rect = text_surface.get_rect(**{align: (x, y)})
     surface.blit(text_surface, text_rect)
 
@@ -183,8 +184,9 @@ class Game:
         # displaying message
         if self.showing_message:
             dialog_box = self.dialog_box.copy()
-            draw_text(dialog_box, self.messages[self.message_index], ARIAL_FONT, 20, BLACK, 20, 20)
-            self.screen.blit(dialog_box, (0, 3*HEIGHT/5))
+            for index, text in enumerate(self.messages[self.message_index]):
+                draw_text(dialog_box, text, ARIAL_FONT, 20, BLACK, 20, 20 + 40*index, background=WHITE)
+            self.screen.blit(dialog_box, (0, 3*HEIGHT/4))
         # pause screen
         if self.paused:
             self.screen.blit(self.dim_screen, (0, 0))
