@@ -50,6 +50,23 @@ def collide_with_group(sprite: pg.sprite.Sprite, group: pg.sprite.Group, dir: st
     return False
 
 
+def find_at_pos(group: pg.sprite.Group, x: int, y:int) -> pg.sprite.Sprite:
+    """Find a sprite from a group at the position specified.
+
+    Args:
+        group (pg.sprite.Group): Group where searching
+        x (int): horizontal position
+        y (int): vertical position
+
+    Returns:
+        pg.sprite.Sprite: the sprite found, or None
+    """
+    for sprite in group.sprites():
+        if sprite.hit_rect.centerx == x and sprite.hit_rect.centery == y:
+            return sprite
+    return None
+
+
 class Player(pg.sprite.Sprite):
     def __init__(self, game, x: int, y: int):
         """Create a Player in the game.
@@ -60,7 +77,7 @@ class Player(pg.sprite.Sprite):
             y (int): vertical position of player center
         """
         self._layer = PLAYER_LAYER  # to display on the good layer
-        self.groups = game.all_sprites, game.players
+        self.groups = game.map_sprites, game.players
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game = game
         self.image = game.player_images['RIGHT_still']
@@ -98,7 +115,7 @@ class Player(pg.sprite.Sprite):
             move_x (int): x deplacement to move player
             move_y (int): y deplacement to move player
             is_running (bool): indicate if the player needs to run
-            use_anim (optional, bool): indicate if animate movement
+            use_anim (optional, bool): indicate if animate movement. Defaults to False
         """
         # select speed
         if is_running:
@@ -135,7 +152,7 @@ class Player(pg.sprite.Sprite):
         Args:
             rot (int): rotation in degrees
             dir (str): constant LEFT, RIGHT, UP or DOWN
-            use_anim (optional, bool): indicate if animate rotation
+            use_anim (optional, bool): indicate if animate rotation. Defaults to False
         """
         self.dir = dir
         self.rot = rot
@@ -166,25 +183,50 @@ class Player(pg.sprite.Sprite):
                 self.move(move_x, move_y, is_running, use_anim=False)
             # play the good animation between rotate and move
             self.increment_animation()
+    
+    def interact_with(self, sprite: pg.sprite.Sprite):
+        """Do nothing.
+        
+        Args:
+            sprite(pg.sprite.Sprite): sprite to interact with
+        """
+        pass
+    
+    def interact(self):
+        """Find a sprite in front of the player and interact with it.
+        """
+        # find the sprite to interact with
+        if self.rot == ROT_RIGHT:
+            sprite = find_at_pos(self.game.map_sprites, self.hit_rect.centerx + TILESIZE, self.hit_rect.centery)
+        elif self.rot == ROT_LEFT:
+            sprite = find_at_pos(self.game.map_sprites, self.hit_rect.centerx - TILESIZE, self.hit_rect.centery)
+        elif self.rot == ROT_UP:
+            sprite = find_at_pos(self.game.map_sprites, self.hit_rect.centerx, self.hit_rect.centery - TILESIZE)
+        elif self.rot == ROT_DOWN:
+            sprite = find_at_pos(self.game.map_sprites, self.hit_rect.centerx, self.hit_rect.centery + TILESIZE)
+        # interact with sprite found
+        if sprite != None:
+            sprite.interact_with(self)
 
     def get_keys(self):
-        """Use the player inputs to control the character.
+        """Use the player inputs to control the character on the map.
         """
-        if not self.moving:
-            keys = pg.key.get_pressed()
-            if keys[pg.K_LEFT] or keys[pg.K_a]:
-                self.dir_key_pressed(ROT_LEFT, LEFT, -TILESIZE, 0, keys[pg.K_SPACE])
-            elif keys[pg.K_RIGHT] or keys[pg.K_d]:
-                self.dir_key_pressed(ROT_RIGHT, RIGHT, TILESIZE, 0, keys[pg.K_SPACE])
-            elif keys[pg.K_UP] or keys[pg.K_w]:
-                self.dir_key_pressed(ROT_UP, UP, 0, -TILESIZE, keys[pg.K_SPACE])
-            elif keys[pg.K_DOWN] or keys[pg.K_s]:
-                self.dir_key_pressed(ROT_DOWN, DOWN, 0, TILESIZE, keys[pg.K_SPACE])
+        if self.moving or self.animated:
+            return
+        # use
+        keys = pg.key.get_pressed()
+        if keys[pg.K_LEFT] or keys[pg.K_q]:
+            self.dir_key_pressed(ROT_LEFT, LEFT, -TILESIZE, 0, keys[pg.K_SPACE])
+        elif keys[pg.K_RIGHT] or keys[pg.K_d]:
+            self.dir_key_pressed(ROT_RIGHT, RIGHT, TILESIZE, 0, keys[pg.K_SPACE])
+        elif keys[pg.K_UP] or keys[pg.K_z]:
+            self.dir_key_pressed(ROT_UP, UP, 0, -TILESIZE, keys[pg.K_SPACE])
+        elif keys[pg.K_DOWN] or keys[pg.K_s]:
+            self.dir_key_pressed(ROT_DOWN, DOWN, 0, TILESIZE, keys[pg.K_SPACE])
 
     def update(self):
         """Move player.
         """
-        self.get_keys()
         # manage animation steps
         if self.animated and (pg.time.get_ticks() - self.started_animation > self.animation[self.animation_index][1]):
             self.animated -= 1
@@ -230,7 +272,7 @@ class NPC(pg.sprite.Sprite):
         """
         self.type = type
         self._layer = NPC_BELOW_LAYER
-        self.groups = game.all_sprites, game.npcs
+        self.groups = game.map_sprites, game.npcs
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game = game
         self.image = game.NPC_images[self.type]['DOWN_still']
@@ -250,6 +292,29 @@ class NPC(pg.sprite.Sprite):
         self.animation_index = 0
         self.animated = 0
         self.started_animation = pg.time.get_ticks()
+    
+    def interact_with(self, player: Player):
+        """Do nothing.
+        
+        Args:
+            player(Player): player to interact with
+        """
+        # can't interact with moving NPC
+        if self.animated or self.moving:
+            return
+        # rotate NPC to face the player
+        if (self.hit_rect.centerx < player.hit_rect.centerx) and (self.rot != ROT_RIGHT):
+            self.rotate(ROT_RIGHT, RIGHT, True)
+        elif (self.hit_rect.centerx > player.hit_rect.centerx) and (self.rot != ROT_LEFT):
+            self.rotate(ROT_LEFT, LEFT, True)
+        elif (self.hit_rect.centery > player.hit_rect.centery) and (self.rot != ROT_UP):
+            self.rotate(ROT_UP, UP, True)
+        elif (self.hit_rect.centery < player.hit_rect.centery) and (self.rot != ROT_DOWN):
+            self.rotate(ROT_DOWN, DOWN, True)
+        # freeze game
+        self.game.freezed = True
+        # display dialogue
+        self.game.display_messages(["test1", "test2"])
     
     def increment_animation(self):
         """Increment the animation step and update image.
@@ -281,7 +346,7 @@ class NPC(pg.sprite.Sprite):
         isColliding = isColliding or collide_with_group(self, self.game.items, self.dir)
         isColliding = isColliding or collide_with_group(self, self.game.npcs, self.dir)
         isColliding = isColliding or collide_with_group(self, self.game.players, self.dir)
-        # animate if needed
+        # animate as needed
         if not isColliding:
             self.vel = vec(WALKING_SPEED, 0).rotate(-self.rot)
             self.animation = WALKING_ANIMATION
@@ -301,7 +366,7 @@ class NPC(pg.sprite.Sprite):
         Args:
             rot (int): rotation in degrees
             dir (str): constant LEFT, RIGHT, UP or DOWN
-            use_anim (optional, bool): indicate if animate rotation
+            use_anim (optional, bool): indicate if animate rotation. Default to False
         
         Returns:
             True
@@ -336,26 +401,28 @@ class NPC(pg.sprite.Sprite):
     def update(self):
         """Update NPC.
         """
+        # NPC move only when game not freezed
+        if not self.game.freezed:
+            # do deplacement loop
+            if not self.moving and not self.animated and (pg.time.get_ticks() - self.last_moved > MOVEMENT_COOLDOWN):
+                movement = NPC_MOVEMENT_LIST[self.move_index]
+                move_tuple = self.get_move_parameters(movement[1])
+                success = False
+                if movement[0] == MOVE:
+                    success = self.move(move_tuple[0], move_tuple[1], move_tuple[2], move_tuple[3])
+                else:
+                    success = self.rotate(move_tuple[2], move_tuple[3], use_anim=True)
+                self.last_moved = pg.time.get_ticks()
+                if success:
+                    # increment move_index
+                    self.move_index += 1
+                    if self.move_index == len(NPC_MOVEMENT_LIST):
+                        self.move_index = 0
         # update layer to display above or below the player
         if (self._layer == NPC_BELOW_LAYER) and (self.game.player.pos.y < self.pos.y):
-            self.game.all_sprites.change_layer(self, NPC_ABOVE_LAYER)
+            self.game.map_sprites.change_layer(self, NPC_ABOVE_LAYER)
         elif (self._layer == NPC_ABOVE_LAYER) and (self.game.player.pos.y > self.pos.y):
-            self.game.all_sprites.change_layer(self, NPC_BELOW_LAYER)
-        # do deplacement loop
-        if not self.moving and (pg.time.get_ticks() - self.last_moved > MOVEMENT_COOLDOWN):
-            movement = NPC_MOVEMENT_LIST[self.move_index]
-            move_tuple = self.get_move_parameters(movement[1])
-            success = False
-            if movement[0] == MOVE:
-                success = self.move(move_tuple[0], move_tuple[1], move_tuple[2], move_tuple[3])
-            else:
-                success = self.rotate(move_tuple[2], move_tuple[3], use_anim=True)
-            self.last_moved = pg.time.get_ticks()
-            if success:
-                # increment move_index
-                self.move_index += 1
-                if self.move_index == len(NPC_MOVEMENT_LIST):
-                    self.move_index = 0
+            self.game.map_sprites.change_layer(self, NPC_BELOW_LAYER)
         # manage animation steps
         if self.animated and (pg.time.get_ticks() - self.started_animation > self.animation[self.animation_index][1]):
             self.animated -= 1
@@ -413,7 +480,7 @@ class Item(pg.sprite.Sprite):
             type (str): type of item
         """
         self._layer = ITEMS_LAYER       # use the good layer
-        self.groups = game.all_sprites, game.items
+        self.groups = game.map_sprites, game.items
         pg.sprite.Sprite.__init__(self, self.groups)
         self.game = game
         self.image = game.item_images[type]
@@ -423,6 +490,14 @@ class Item(pg.sprite.Sprite):
         self.rect.center = pos
         self.hit_rect = pg.Rect(0, 0, TILESIZE, TILESIZE)
         self.hit_rect.center = self.rect.center
+    
+    def interact_with(self, sprite: pg.sprite.Sprite):
+        """Do nothing.
+        
+        Args:
+            sprite(pg.sprite.Sprite): sprite to interact with
+        """
+        pass
 
     def update(self):
         """Do nothing.

@@ -11,6 +11,25 @@ from sprites import *
 from tilemap import *
 
 
+def draw_text(surface: pg.surface.Surface, text: str, font_name: str, size: int, color: tuple, x: int, y: int, align="topleft"):
+    """Draw text on a surface.
+
+    Args:
+        surface (pg.surface.Surface): surface where to draw text
+        text (str): text to display
+        font_name (str): font path
+        size (int): font size
+        color (tuple): text color, (R, G, B) format
+        x (int): text position on horizontal axis
+        y (int): text position on vertical axis
+        align (str, optional): (x, y) position compared to text. Defaults to "topleft".
+    """
+    font = pg.font.Font(font_name, size)
+    text_surface = font.render(text, True, color)
+    text_rect = text_surface.get_rect(**{align: (x, y)})
+    surface.blit(text_surface, text_rect)
+
+
 class Game:
     def __init__(self):
         """Class used to create the game.
@@ -22,23 +41,6 @@ class Game:
         self.clock = pg.time.Clock()                                    # game clock
         self.load_data()
 
-    def draw_text(self, text: str, font_name: str, size: int, color: tuple, x: int, y: int, align="topleft"):
-        """Draw text on the screen.
-
-        Args:
-            text (str): text to display
-            font_name (str): font path
-            size (int): font size
-            color (tuple): text color, (R, G, B) format
-            x (int): text position on horizontal axis
-            y (int): text position on vertical axis
-            align (str, optional): (x, y) position compared to text. Defaults to "topleft".
-        """
-        font = pg.font.Font(font_name, size)
-        text_surface = font.render(text, True, color)
-        text_rect = text_surface.get_rect(**{align: (x, y)})
-        self.screen.blit(text_surface, text_rect)
-
     def load_data(self):
         """Load data used by the game.
         """
@@ -49,9 +51,6 @@ class Game:
         music_folder = path.join(game_folder, 'music')
         self.map_folder = path.join(game_folder, 'maps')
         
-        # load fonts
-        self.title_font = path.join(self.img_folder, 'ZOMBIE.TTF')
-        self.hud_font = path.join(self.img_folder, 'Impacted2.0.ttf')
         # load images
         self.player_images = {}
         for image in PLAYER_IMAGES:
@@ -70,6 +69,9 @@ class Game:
         # create pause screen background
         self.dim_screen = pg.Surface(self.screen.get_size()).convert_alpha()
         self.dim_screen.fill((0, 0, 0, 180))
+        # create dialog box
+        self.dialog_box = pg.Surface((WIDTH, HEIGHT/4))
+        self.dialog_box.fill(WHITE)
         # lighting effect
         self.fog = pg.Surface((WIDTH, HEIGHT))
         self.fog.fill(NIGHT_COLOR)
@@ -81,7 +83,7 @@ class Game:
         """Initialize all variables and do all the setup for a new game.
         """
         # create sprite groups
-        self.all_sprites = pg.sprite.LayeredUpdates()                   # use layers to display sprites
+        self.map_sprites = pg.sprite.LayeredUpdates()                   # use layers to display sprites
         self.walls = pg.sprite.Group()
         self.items = pg.sprite.Group()
         self.npcs = pg.sprite.Group()
@@ -121,6 +123,8 @@ class Game:
         self.draw_debug = False
         self.paused = False
         self.night = False
+        self.freezed = False
+        self.showing_message = False
         # play the start sound
         self.effects_sounds['level_start'].play()
 
@@ -134,8 +138,7 @@ class Game:
         while self.playing:
             self.dt = self.clock.tick(FPS) / 1000.0  # get the elapsed time between two frames
             self.events()
-            if not self.paused:
-                self.update()
+            self.update()
             self.draw()
 
     def quit(self):
@@ -148,7 +151,7 @@ class Game:
         """Update all the elements of the game.
         """
         self.screen.fill(BLACK)
-        self.all_sprites.update()   # use the method update for each sprite
+        self.map_sprites.update()   # use the method update for each sprite
         self.camera.update(self.player) # the camera follow the player
 
     def render_fog(self):
@@ -164,8 +167,8 @@ class Game:
         """
         pg.display.set_caption("{:.2f}".format(self.clock.get_fps()))   # fps
         self.screen.blit(self.map_img, self.camera.apply(self.map))     # draw the map at the correct position for the camera
-        # update sprites
-        for sprite in self.all_sprites:
+        # update sprites on the map
+        for sprite in self.map_sprites:
             self.screen.blit(sprite.image, self.camera.apply(sprite))   # draw the sprites at the correct position for the camera
             if self.draw_debug:
                 pg.draw.rect(self.screen, CYAN, self.camera.apply_rect(sprite.hit_rect), 1) # draw hitboxes
@@ -177,28 +180,65 @@ class Game:
         if self.night:
             self.render_fog()
         # HUD functions
+        # displaying message
+        if self.showing_message:
+            dialog_box = self.dialog_box.copy()
+            draw_text(dialog_box, self.messages[self.message_index], ARIAL_FONT, 20, BLACK, 20, 20)
+            self.screen.blit(dialog_box, (0, 3*HEIGHT/5))
         # pause screen
         if self.paused:
             self.screen.blit(self.dim_screen, (0, 0))
-            self.draw_text("Paused", self.title_font, 105, RED, WIDTH / 2, HEIGHT / 2, align="center")
+            draw_text(self.screen, "Paused", ARIAL_FONT, 105, RED, WIDTH / 2, HEIGHT / 2, align="center")
         pg.display.flip()   # update screen
 
     def events(self):
         """Manage player inputs.
         """
         # catch all events here
-        for event in pg.event.get():
-            if event.type == pg.QUIT:
-                self.quit()
+        events = pg.event.get()
+        for event in events:
             if event.type == pg.KEYDOWN:
-                if event.key == pg.K_ESCAPE:
+                if event.key == pg.K_SPACE:
+                    if self.showing_message:
+                        self.scroll_messages()
+                elif event.key == pg.K_e:
+                    if self.showing_message:
+                        self.scroll_messages()
+                    elif not self.freezed:
+                        self.player.interact()
+                elif event.key == pg.K_ESCAPE:
                     self.quit()
-                if event.key == pg.K_h:
+                elif event.key == pg.K_h:
                     self.draw_debug = not self.draw_debug
-                if event.key == pg.K_p:
+                elif event.key == pg.K_p:
                     self.paused = not self.paused
-                if event.key == pg.K_n:
+                elif event.key == pg.K_n:
                     self.night = not self.night
+            elif event.type == pg.QUIT:
+                self.quit()
+        # control player on the map
+        if not self.freezed:
+            self.player.get_keys()
+    
+    def display_messages(self, messages: list):
+        """Display dialog box with elements from message list.
+
+        Args:
+            messages (list): list of messages to display
+        """
+        self.messages = messages
+        self.messages_nb = len(messages)
+        self.message_index = 0
+        if self.message_index < self.messages_nb:
+            self.showing_message = True
+        else:
+            self.freezed = False
+    
+    def scroll_messages(self):
+        self.message_index += 1
+        if self.message_index >= self.messages_nb:
+            self.showing_message = False
+            self.freezed = False
 
     def show_start_screen(self):
         """Do NOT draw a start screen.

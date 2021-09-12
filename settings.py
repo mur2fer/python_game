@@ -123,3 +123,6 @@ BOB_SPEED = 0.3
 # Sounds
 BG_MUSIC = 'espionage.ogg'
 EFFECTS_SOUNDS = {'level_start': 'level_start.wav'}
+
+# Fonts
+ARIAL_FONT = pg.font.match_font('arial')
